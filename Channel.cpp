@@ -30,11 +30,6 @@ void Channel::setRevent(int revent)
     revent_ = revent;
 }
 
-int Channel::getSockfd()
-{
-    return sockfd_;
-}
-
 void Channel::enableRead()
 {
     event_ |= EPOLLIN;

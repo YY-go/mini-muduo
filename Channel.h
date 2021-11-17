@@ -11,7 +11,6 @@ public:
     void setCallBack(IChannelCallBack* callBack);
     void handleEvent();
     void setRevent(int revent);
-    int getSockfd();
     void enableRead();
 private:
     void update();
