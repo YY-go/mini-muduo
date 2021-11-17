@@ -3,16 +3,17 @@
 
 #include "IChannelCallBack.h"
 class Channel;
+class EventLoop;
 
 class TcpConnection : IChannelCallBack
 {
 public:
-    TcpConnection(int epollfd, int sockfd);
+    TcpConnection(EventLoop* loop, int sockfd);
     ~TcpConnection();
 
     virtual void OnIn(int sockfd);
 private:
-    int epollfd_;
+    EventLoop* loop_;
     int cfd_;
     Channel* pChannel_;
 };

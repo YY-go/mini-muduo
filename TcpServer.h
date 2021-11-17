@@ -6,6 +6,7 @@
 #include <map>
 class Acceptor;
 class TcpConnection;
+class EventLoop;
 
 class Channel;
 const int max_events = 1024;
@@ -13,14 +14,12 @@ const int max_events = 1024;
 class TcpServer : public IAcceptorCallBack
 {
 public:
-    TcpServer();
+    TcpServer(EventLoop* loop);
     ~TcpServer();
     void start();
     virtual void newConnection(int sockfd);
 private:
-    void update(Channel* pChannel, int op);
-
-    int epollfd_;
+    EventLoop* loop_;
     struct epoll_event events_[max_events];
     std::map<int, TcpConnection*> connectons_;
     Acceptor* pAcceptor_;

@@ -6,10 +6,10 @@
 #include <iostream>
 #include "Channel.h"
 
-TcpConnection::TcpConnection(int epollfd, int sockfd): epollfd_(epollfd),
+TcpConnection::TcpConnection(EventLoop* loop, int sockfd): loop_(loop),
                                                        cfd_(sockfd), pChannel_(nullptr)
 {
-    pChannel_ = new Channel(epollfd_, cfd_);
+    pChannel_ = new Channel(loop_, cfd_);
     pChannel_->setCallBack(this);
     pChannel_->enableRead();
     std::cout << "new connection, socket: " << sockfd << std::endl;

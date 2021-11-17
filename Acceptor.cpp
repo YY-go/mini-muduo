@@ -8,7 +8,7 @@
 #include "IAcceptorCallBack.h"
 
 
-Acceptor::Acceptor(int epollfd) : epollfd_(epollfd), lfd_(-1),
+Acceptor::Acceptor(EventLoop* loop) : loop_(loop), lfd_(-1),
                                   pAcceptorChannel(nullptr), pCallBack_(nullptr)
 {
 
@@ -48,7 +48,7 @@ int Acceptor::init()
 void Acceptor::start()
 {
     lfd_ = init();
-    pAcceptorChannel = new Channel(epollfd_, lfd_);
+    pAcceptorChannel = new Channel(loop_, lfd_);
     pAcceptorChannel->setCallBack(this);
     pAcceptorChannel->enableRead();
 }
