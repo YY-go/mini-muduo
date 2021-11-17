@@ -16,7 +16,7 @@
 
 using namespace std;
 
-TcpServer::TcpServer(EventLoop* loop) : loop_(loop), pAcceptor_(nullptr)
+TcpServer::TcpServer(EventLoop* loop) : loop_(loop), pAcceptor_(nullptr), pUser_(nullptr)
 {
 
 }
@@ -37,5 +37,12 @@ void TcpServer::newConnection(int sockfd)
 {
     TcpConnection* pTcpConnecton = new TcpConnection(loop_, sockfd);
     connectons_[sockfd] = pTcpConnecton;
+    pTcpConnecton->setUser(pUser_);
+    pTcpConnecton->connectEstablished();
+}
+
+void TcpServer::setCallBack(IMuduoUser* pUser)
+{
+    pUser_ = pUser;
 }
 

@@ -5,14 +5,14 @@
 #include <strings.h>
 #include <iostream>
 #include "Channel.h"
+#include "IMuduoUser.h"
 
-TcpConnection::TcpConnection(EventLoop* loop, int sockfd): loop_(loop),
-                                                       cfd_(sockfd), pChannel_(nullptr)
+TcpConnection::TcpConnection(EventLoop* loop, int sockfd): loop_(loop), cfd_(sockfd), 
+                                                           pChannel_(nullptr), pUser_(nullptr)
 {
     pChannel_ = new Channel(loop_, cfd_);
     pChannel_->setCallBack(this);
     pChannel_->enableRead();
-    std::cout << "new connection, socket: " << sockfd << std::endl;
 }
 
 TcpConnection::~TcpConnection()
@@ -39,9 +39,34 @@ void TcpConnection::OnIn(int sockfd)
     }
     else
     {
-        int writelen = write(sockfd, buf, ret);
-        if(writelen != ret)    perror("write error");
+        std::string mes(buf, ret);
+        pUser_->OnMessage(this, mes);
     }
 
+}
+
+void TcpConnection::send(const std::string& message)
+{
+    int n = ::write(cfd_, message.c_str(), message.size());
+    if(n != message.size()) 
+    {
+        perror("write error: ");
+        std::cout << message.size() - n << "Bytes left" << std::endl;
+    }
+}
+
+void TcpConnection::setUser(IMuduoUser* pUser)
+{
+    pUser_ = pUser;
+}
+
+void TcpConnection::connectEstablished()
+{
+    if(pUser_) pUser_->OnConnection(this);
+}
+
+int TcpConnection::getSocket()
+{
+    return cfd_;
 }
 
