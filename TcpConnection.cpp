@@ -6,14 +6,12 @@
 #include <iostream>
 #include "Channel.h"
 #include "IMuduoUser.h"
+#include "EventLoop.h"
 
 TcpConnection::TcpConnection(EventLoop* loop, int sockfd)
     : loop_(loop)
     , cfd_(sockfd)
-    , pChannel_(nullptr)
     , pUser_(nullptr)
-    , inBuf_(new std::string)
-    , outBuf_(new std::string)
 {
     pChannel_ = new Channel(loop_, cfd_);
     pChannel_->setCallBack(this);
@@ -44,20 +42,25 @@ void TcpConnection::handleRead()
     }
     else
     {
-        inBuf_->append(buf, readBytes);
-        pUser_->OnMessage(this, inBuf_);
+        std::string line(buf, readBytes);
+        inBuf_.append(line);
+        pUser_->OnMessage(this, &inBuf_);
     }
 
 }
 
 void TcpConnection::handleWrite()
 {
-    int writeBytes = ::write(cfd_, outBuf_->c_str(), outBuf_->size());
+    int writeBytes = ::write(cfd_, outBuf_.peek(), outBuf_.readableBytes());
     if(writeBytes == -1) perror("write error");
     else
     {
-        *outBuf_ = outBuf_->substr(writeBytes, outBuf_->size());
-        if(outBuf_->empty()) pChannel_->disableWrite();
+        outBuf_.retrieve(writeBytes); 
+        if(outBuf_.readableBytes() == 0)
+        {
+            pChannel_->disableWrite();
+            loop_->queueLoop(this);
+        }
     }
 }
 
@@ -65,7 +68,7 @@ void TcpConnection::send(const std::string& message)
 {
     if(pChannel_->isWriting())
     {
-        outBuf_->append(message, message.size());
+        outBuf_.append(message);
     }
     else
     {
@@ -75,9 +78,11 @@ void TcpConnection::send(const std::string& message)
         {
             if(writeBytes != message.size()) 
             {
-                outBuf_->append(message[writeBytes], message.size() - writeBytes);
+                outBuf_.append(message.substr(writeBytes, message.size()));
                 pChannel_->enableWrite();
             }
+            else
+                loop_->queueLoop(this);
 
         }
 
@@ -99,3 +104,7 @@ int TcpConnection::getSocket()
     return cfd_;
 }
 
+void TcpConnection::run()
+{
+    pUser_->OnWriteComplete(this);
+}

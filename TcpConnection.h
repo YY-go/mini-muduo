@@ -3,12 +3,15 @@
 
 #include <string>
 #include "IChannelCallBack.h"
+#include "Buffer.h"
+#include "IRun.h"
 class Channel;
 class EventLoop;
 class IMuduoUser;
 class IAcceptorCallback;
 
-class TcpConnection : IChannelCallBack
+class TcpConnection : public IChannelCallBack
+                    , public IRun
 {
 public:
     TcpConnection(EventLoop* loop, int sockfd);
@@ -19,13 +22,14 @@ public:
     int getSocket();
     virtual void handleRead();
     virtual void handleWrite();
+    virtual void run();
 private:
     EventLoop* loop_;
     int cfd_;
     Channel* pChannel_;
     IMuduoUser* pUser_;
-    std::string* inBuf_;
-    std::string* outBuf_;
+    Buffer inBuf_;
+    Buffer outBuf_;
 };
 
 #endif
