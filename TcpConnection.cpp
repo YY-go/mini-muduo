@@ -59,7 +59,7 @@ void TcpConnection::handleWrite()
         if(outBuf_.readableBytes() == 0)
         {
             pChannel_->disableWrite();
-            loop_->queueLoop(this);
+            loop_->queueLoop(this, nullptr);
         }
     }
 }
@@ -82,7 +82,7 @@ void TcpConnection::send(const std::string& message)
                 pChannel_->enableWrite();
             }
             else
-                loop_->queueLoop(this);
+                loop_->queueLoop(this, nullptr);
 
         }
 
@@ -104,7 +104,7 @@ int TcpConnection::getSocket()
     return cfd_;
 }
 
-void TcpConnection::run()
+void TcpConnection::run(void* param)
 {
     pUser_->OnWriteComplete(this);
 }

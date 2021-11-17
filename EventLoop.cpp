@@ -5,8 +5,12 @@
 #include "Channel.h"
 #include <sys/eventfd.h>
 #include <stdio.h>
+#include "TimerQueue.h"
 
-EventLoop::EventLoop() : quit_(false), poller_(new Epoll())
+EventLoop::EventLoop() 
+    : quit_(false)
+    , poller_(new Epoll())
+    , pTimerQueue_(new TimerQueue(this))
 {
     eventfd_ = createEventfd();
     pWakeupChannel_ = new Channel(this, eventfd_);
@@ -38,9 +42,10 @@ void EventLoop::update(Channel* pChannel)
     poller_->update(pChannel);
 }
 
-void EventLoop::queueLoop(IRun* pRun)
+void EventLoop::queueLoop(IRun* pRun, void* param)
 {
-    PendingFunctors_.push_back(pRun);
+    Runner r(pRun, param);
+    PendingFunctors_.push_back(r);
     wakeup();
 }
 
@@ -66,9 +71,9 @@ void EventLoop::handleWrite()
 
 void EventLoop::doPendingFunctors()
 {
-    std::vector<IRun*> tempRuns;
+    std::vector<Runner> tempRuns;
     tempRuns.swap(PendingFunctors_);
-    for(auto f : tempRuns) f->run();
+    for(auto f : tempRuns) f.doRun();
 }
 
 int EventLoop::createEventfd()
@@ -76,5 +81,25 @@ int EventLoop::createEventfd()
     int n = eventfd(0, 0);
     if(n == -1) perror("eventfd error");
     return n;
+}
+
+int64_t EventLoop::runAt(MyTimeStamp when, IRun* pRun)
+{
+    return pTimerQueue_->addTimer(pRun, when, 0.0);
+}
+
+int64_t EventLoop::runAfter(double delay, IRun* pRun)
+{
+    return pTimerQueue_->addTimer(pRun, MyTimeStamp::nowAfter(delay), 0.0);
+}
+
+int64_t EventLoop::runEvery(double interval, IRun* pRun)
+{
+    return pTimerQueue_->addTimer(pRun, MyTimeStamp::nowAfter(interval), interval);
+}
+
+void EventLoop::cancelTimer(int64_t timerfd)
+{
+    pTimerQueue_->cancelTimer(timerfd);
 }
 

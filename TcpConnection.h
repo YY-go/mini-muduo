@@ -1,7 +1,6 @@
 #ifndef TCPCONNECTION_H
 #define TCPCONNECTION_H
 
-#include <string>
 #include "IChannelCallBack.h"
 #include "Buffer.h"
 #include "IRun.h"
@@ -22,7 +21,7 @@ public:
     int getSocket();
     virtual void handleRead();
     virtual void handleWrite();
-    virtual void run();
+    virtual void run(void* param);
 private:
     EventLoop* loop_;
     int cfd_;
