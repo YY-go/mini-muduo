@@ -11,7 +11,7 @@ public:
     EchoServer(EventLoop* loop);
     ~EchoServer();
     void start();
-    virtual void OnMessage(TcpConnection* pCon, const std::string& data);
+    virtual void OnMessage(TcpConnection* pCon, std::string* data);
     virtual void OnConnection(TcpConnection* pCon);
 private:
     EventLoop* loop_;

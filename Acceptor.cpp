@@ -8,8 +8,11 @@
 #include "IAcceptorCallBack.h"
 
 
-Acceptor::Acceptor(EventLoop* loop) : loop_(loop), lfd_(-1),
-                                  pAcceptorChannel(nullptr), pCallBack_(nullptr)
+Acceptor::Acceptor(EventLoop* loop)
+    : loop_(loop)
+    , lfd_(-1)
+    , pAcceptorChannel(nullptr)
+    , pCallBack_(nullptr)
 {
 
 }
@@ -58,7 +61,7 @@ void Acceptor::setCallBack(IAcceptorCallBack* pCallBack)
     pCallBack_ = pCallBack;
 }
 
-void Acceptor::OnIn(int sockfd)
+void Acceptor::handleRead()
 {
     struct sockaddr_in clet_addr;
     bzero(&clet_addr, sizeof clet_addr);
@@ -67,5 +70,10 @@ void Acceptor::OnIn(int sockfd)
     int cfd = accept4(lfd_, (struct sockaddr*) &clet_addr, &clet_addr_len, SOCK_CLOEXEC | SOCK_NONBLOCK);
     if(cfd == -1)   perror("accept error");
     pCallBack_->newConnection(cfd);
+}
+
+void Acceptor::handleWrite()
+{
+
 }
 

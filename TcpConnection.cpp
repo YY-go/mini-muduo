@@ -7,8 +7,13 @@
 #include "Channel.h"
 #include "IMuduoUser.h"
 
-TcpConnection::TcpConnection(EventLoop* loop, int sockfd): loop_(loop), cfd_(sockfd), 
-                                                           pChannel_(nullptr), pUser_(nullptr)
+TcpConnection::TcpConnection(EventLoop* loop, int sockfd)
+    : loop_(loop)
+    , cfd_(sockfd)
+    , pChannel_(nullptr)
+    , pUser_(nullptr)
+    , inBuf_(new std::string)
+    , outBuf_(new std::string)
 {
     pChannel_ = new Channel(loop_, cfd_);
     pChannel_->setCallBack(this);
@@ -20,38 +25,62 @@ TcpConnection::~TcpConnection()
 
 }
 
-void TcpConnection::OnIn(int sockfd)
+void TcpConnection::handleRead()
 {
     char buf[1024];
     bzero(buf, sizeof buf);
 
-    int ret = read(sockfd, buf, 1024);
-    if(ret < 0)
+    int readBytes = read(cfd_, buf, 1024);
+    if(readBytes < 0)
     {
         perror("read error");
-        if(errno == ECONNRESET) close(sockfd);
-        std::cout << "connection close, socket: " << sockfd << std::endl;
+        if(errno == ECONNRESET) close(cfd_);
+        std::cout << "connection close, socket: " << cfd_ << std::endl;
     }
-    else if(ret == 0)
+    else if(readBytes == 0)
     {
-        close(sockfd);
-        std::cout << "connection close, socket: " << sockfd << std::endl;
+        close(cfd_);
+        std::cout << "connection close, socket: " << cfd_ << std::endl;
     }
     else
     {
-        std::string mes(buf, ret);
-        pUser_->OnMessage(this, mes);
+        inBuf_->append(buf, readBytes);
+        pUser_->OnMessage(this, inBuf_);
     }
 
 }
 
+void TcpConnection::handleWrite()
+{
+    int writeBytes = ::write(cfd_, outBuf_->c_str(), outBuf_->size());
+    if(writeBytes == -1) perror("write error");
+    else
+    {
+        *outBuf_ = outBuf_->substr(writeBytes, outBuf_->size());
+        if(outBuf_->empty()) pChannel_->disableWrite();
+    }
+}
+
 void TcpConnection::send(const std::string& message)
 {
-    int n = ::write(cfd_, message.c_str(), message.size());
-    if(n != message.size()) 
+    if(pChannel_->isWriting())
     {
-        perror("write error: ");
-        std::cout << message.size() - n << "Bytes left" << std::endl;
+        outBuf_->append(message, message.size());
+    }
+    else
+    {
+        int writeBytes = ::write(cfd_, message.c_str(), message.size());
+        if(writeBytes == -1) perror("wirte error");
+        else
+        {
+            if(writeBytes != message.size()) 
+            {
+                outBuf_->append(message[writeBytes], message.size() - writeBytes);
+                pChannel_->enableWrite();
+            }
+
+        }
+
     }
 }
 

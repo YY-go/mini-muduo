@@ -5,8 +5,13 @@
 #include "EventLoop.h"
 
 
-Channel::Channel(EventLoop* loop, int sockfd) : sockfd_(sockfd), event_(0), 
-                                            revent_(0), loop_(loop), callBack_(nullptr)
+Channel::Channel(EventLoop* loop, int sockfd) 
+    : sockfd_(sockfd)
+    , event_(0)
+    , revent_(0)
+    , index_(-1)
+    , loop_(loop)
+    , callBack_(nullptr)
 {
 
 }
@@ -23,7 +28,11 @@ void Channel::setCallBack(IChannelCallBack* callBack)
 
 void Channel::handleEvent()
 {
-    if(callBack_ && revent_ & EPOLLIN) callBack_->OnIn(sockfd_);
+    if(callBack_)
+    {
+        if(revent_ & EPOLLIN) callBack_->handleRead();
+        if(revent_ & EPOLLOUT) callBack_->handleWrite();
+    }
 }
 
 void Channel::setRevent(int revent)
@@ -31,10 +40,32 @@ void Channel::setRevent(int revent)
     revent_ = revent;
 }
 
+void Channel::setIndex(int index)
+{
+    index_ = index;
+}
+
 void Channel::enableRead()
 {
     event_ |= EPOLLIN;
     update();
+}
+
+void Channel::enableWrite()
+{
+    event_ |= EPOLLOUT;
+    update();
+}
+
+void Channel::disableWrite()
+{
+    event_ &= ~EPOLLOUT;
+    update();
+}
+
+bool Channel::isWriting()
+{
+    return event_ & EPOLLOUT;
 }
 
 int Channel::getEvents()
@@ -45,6 +76,11 @@ int Channel::getEvents()
 int Channel::getSockfd()
 {
     return sockfd_;
+}
+
+int Channel::getIndex()
+{
+    return index_;
 }
 
 void Channel::update()

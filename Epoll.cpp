@@ -2,6 +2,9 @@
 #include "stdio.h"
 #include "Channel.h"
 
+const int kNew = -1;
+const int kAdded = 1;
+
 Epoll::Epoll()
 {
     epollfd_ = epoll_create1(EPOLL_CLOEXEC);
@@ -37,7 +40,18 @@ void Epoll::update(Channel* pChannel)
     ev.data.ptr = pChannel;
     ev.events = pChannel->getEvents();
     int fd = pChannel->getSockfd();
-    int ret = epoll_ctl(epollfd_, EPOLL_CTL_ADD, fd, &ev);
-    if(ret == -1)   perror("epoll_ctl error");
+
+    int index = pChannel->getIndex();
+    if(index == kNew)
+    {
+        int ret = epoll_ctl(epollfd_, EPOLL_CTL_ADD, fd, &ev);
+        if(ret == -1)   perror("epoll_ctl error");
+        pChannel->setIndex(kAdded);
+    }
+    else
+    {
+        int ret = epoll_ctl(epollfd_, EPOLL_CTL_MOD, fd, &ev);
+        if(ret == -1) perror("epoll_ctl error");
+    }
 }
   

@@ -4,7 +4,8 @@
 class IChannelCallBack
 {
 public:
-    virtual void OnIn(int sockfd) = 0;
+    virtual void handleRead() = 0;
+    virtual void handleWrite() = 0;
 };
 
 #endif

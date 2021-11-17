@@ -17,12 +17,15 @@ public:
     void connectEstablished();
     void setUser(IMuduoUser* pUser);
     int getSocket();
-    virtual void OnIn(int sockfd);
+    virtual void handleRead();
+    virtual void handleWrite();
 private:
     EventLoop* loop_;
     int cfd_;
     Channel* pChannel_;
     IMuduoUser* pUser_;
+    std::string* inBuf_;
+    std::string* outBuf_;
 };
 
 #endif

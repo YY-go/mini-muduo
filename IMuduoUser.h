@@ -8,7 +8,7 @@ class IMuduoUser
 {
 public:
     virtual void OnConnection(TcpConnection* pCon) = 0;
-    virtual void OnMessage(TcpConnection* pCon, const std::string& data) = 0;
+    virtual void OnMessage(TcpConnection* pCon, std::string* data) = 0;
 };
 
 #endif
