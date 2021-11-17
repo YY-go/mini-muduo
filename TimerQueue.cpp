@@ -4,13 +4,12 @@
 #include <sys/timerfd.h>
 #include <string.h>
 #include "EventLoop.h"
+#include "Timer.h"
 
 TimerQueue::TimerQueue(EventLoop* loop)
     : timerfd_(createTimerfd())
     , loop_(loop)
     , timerfdChannel_(new Channel(loop_, timerfd_))
-    , pAddTimerWrapper_(new AddTimerWrapper(this))
-    , pCancelTimerWrapper_(new CancelTimerWrapper(this))
 {
     timerfdChannel_->setCallBack(this);
     timerfdChannel_->enableRead();
@@ -21,35 +20,45 @@ TimerQueue::~TimerQueue()
     ::close(timerfd_);
 }
 
-void TimerQueue::doAddTimer(void* param)
+void TimerQueue::run2(const std::string& str, void* timer)
 {
-    Timer* pTimer = static_cast<Timer*>(param);
-    bool earliestChanged = insert(pTimer);
-    if(earliestChanged)
-        resetTimerfd(timerfd_, pTimer->getStamp());
+    if(str == "addtimer")
+        doAddTimer((Timer*)timer);
+    else if(str == "canceltimer")
+        doCancelTimer((Timer*)timer);
 }
 
-void TimerQueue::doCancelTimer( void* param )
+void TimerQueue::doAddTimer(Timer* timer)
 {
-    Timer* pTimer = static_cast<Timer*>(param);
+    bool earliestChanged = insert(timer);
+    if(earliestChanged)
+        resetTimerfd(timerfd_, timer->getStamp());
+}
+
+void TimerQueue::doCancelTimer(Timer* timer)
+{
     for(auto e : timers_)
-        if(e.second == pTimer)
+        if(e.second == timer)
         {
             timers_.erase(e);
             break;
         }
 }
 
-int64_t TimerQueue::addTimer(IRun* pRun, MyTimeStamp when, double interval)
+int64_t TimerQueue::addTimer(IRun0* pRun, MyTimeStamp when, double interval)
 {
     Timer* pTimer = new Timer(when, pRun, interval);
-    loop_->queueLoop(pAddTimerWrapper_, pTimer);
+    std::string str("addtimer");
+    Task task(this, str, pTimer);
+    loop_->queueInLoop(task);
     return (int64_t)pTimer;
 }
 
-void TimerQueue::cancelTimer(int64_t timerfd)
+void TimerQueue::cancelTimer(int64_t timerId)
 {
-    loop_->queueLoop(pCancelTimerWrapper_, (void*)timerfd);
+    std::string str("canceltimer");
+    Task task(this, str, (void*)timerId);
+    loop_->queueInLoop(task);
 }
 
 void TimerQueue::handleRead()
@@ -59,7 +68,7 @@ void TimerQueue::handleRead()
 
     std::vector<Entry> expired = getExpired(now);
     for(auto entry : expired)
-        entry.second->run();
+        entry.second->timeout();
     reset(expired, now);
 }
 

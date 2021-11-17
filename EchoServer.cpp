@@ -3,16 +3,18 @@
 #include "TcpConnection.h"
 #include "sys/time.h"
 #include "EventLoop.h"
+#include "Task.h"
+#include "CurrentThread.h"
 
 const int message_length = 8;
 
 EchoServer::EchoServer(EventLoop* loop)
     : loop_(loop)
-    , Server_(loop)
+    , server_(loop)
     , timer_(-1)
     , index_(0)
 {
-    Server_.setCallBack(this);
+    server_.setCallBack(this);
 }
 
 EchoServer::~EchoServer()
@@ -22,7 +24,8 @@ EchoServer::~EchoServer()
 
 void EchoServer::start()
 {
-    Server_.start();
+    server_.start();
+    threadPool_.start(3);
 }
 
 void EchoServer::OnMessage(TcpConnection* pCon, Buffer* pBuf)
@@ -30,9 +33,9 @@ void EchoServer::OnMessage(TcpConnection* pCon, Buffer* pBuf)
     while(pBuf->readableBytes() >= message_length)
     {
         std::string message = pBuf->retrieveAsString(message_length);
-        pCon->send(message + "\n");
+        Task task(this, message, pCon);
+        threadPool_.addTask(task);
     }
-    timer_ = loop_->runEvery(0.5, this);
 }
 
 void EchoServer::OnConnection(TcpConnection* pCon)
@@ -47,12 +50,14 @@ void EchoServer::OnWriteComplete(TcpConnection* pCon)
     std::cout << tv.tv_sec << "." << tv.tv_usec  << " OnWriteComplete" << std::endl;
 }
 
-void EchoServer::run(void* param)
+void EchoServer::run2(const std::string& str, void* param)
 {
-    std::cout << index_ << std::endl;
-    if(index_++ == 3)
-    {
-        loop_->cancelTimer(timer_);
-        index_ = 0;
-    }
+    printf("fib(45) = %d, tid = %d\n", fib(45), CurrentThread::tid());
+    ((TcpConnection*)param)->send(str + "\n");
 }
+
+int EchoServer::fib(int n)
+{
+    return (n == 1 || n == 2) ? 1 : (fib(n-1) + fib(n-2));
+}
+

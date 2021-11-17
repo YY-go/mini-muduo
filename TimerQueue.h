@@ -8,95 +8,23 @@
 #include <set>
 class EventLoop;
 class Channel;
+class Timer;
 
 class TimerQueue : public IChannelCallBack
+                 , public IRun2
 {
 public:
-    class Timer
-    {
-    public:
-        Timer(MyTimeStamp stamp, IRun* pRun, double interval)
-            :stamp_(stamp)
-            , id_(stamp)
-            , pRun_(pRun)
-            , interval_(interval)
-        {
-
-        }
-        
-        MyTimeStamp getStamp()
-        {
-            return stamp_;
-        }
-
-        MyTimeStamp getId()
-        {
-            return id_;
-        }
-
-        void run()
-        {
-            pRun_->run(this);
-        }
-
-        bool isRepeat()
-        {
-            return interval_ > 0;
-        }
-
-        void moveToNext()
-        {
-            stamp_ = MyTimeStamp::nowAfter(interval_);
-        }
-    private:
-        MyTimeStamp stamp_;
-        MyTimeStamp id_;
-        IRun* pRun_;
-        double interval_;
-    };
-
-    class AddTimerWrapper : public IRun
-    {
-    public:
-        AddTimerWrapper(TimerQueue* pQueue)
-            : pQueue_(pQueue)
-        {
-            
-        }
-
-        virtual void run(void* param)
-        {
-            pQueue_->doAddTimer(param);
-        }
-    private:
-        TimerQueue* pQueue_;
-    };
-
-    class CancelTimerWrapper : public IRun
-    {
-    public:
-        CancelTimerWrapper(TimerQueue* pQueue)
-            :pQueue_(pQueue)
-        {
-        }
-        
-        virtual void run(void* param)
-        {
-            pQueue_->doCancelTimer(param);
-        }
-    private:
-        TimerQueue* pQueue_;
-    };
 
     TimerQueue(EventLoop* loop);
     ~TimerQueue();
-    void doAddTimer(void* param);
-    void doCancelTimer( void* param );
-    int64_t addTimer(IRun* pRun, MyTimeStamp when, double interval);
-    void cancelTimer(int64_t timerfd);
+    void doAddTimer(Timer* timer);
+    void doCancelTimer(Timer* timer);
+    int64_t addTimer(IRun0* pRun, MyTimeStamp when, double interval);
+    void cancelTimer(int64_t timerId);
 
     virtual void handleRead();
     virtual void handleWrite();
+    virtual void run2(const std::string& str, void* timer);
 
     private:
     typedef std::pair<MyTimeStamp, Timer*> Entry;
@@ -114,8 +42,6 @@ public:
     TimerList timers_;
     EventLoop* loop_;
     Channel* timerfdChannel_;
-    AddTimerWrapper* pAddTimerWrapper_;
-    CancelTimerWrapper* pCancelTimerWrapper_;
 };
 
 #endif

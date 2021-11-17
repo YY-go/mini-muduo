@@ -7,6 +7,7 @@
 #include "Channel.h"
 #include "IMuduoUser.h"
 #include "EventLoop.h"
+#include "Task.h"
 
 TcpConnection::TcpConnection(EventLoop* loop, int sockfd)
     : loop_(loop)
@@ -59,12 +60,13 @@ void TcpConnection::handleWrite()
         if(outBuf_.readableBytes() == 0)
         {
             pChannel_->disableWrite();
-            loop_->queueLoop(this, nullptr);
+            Task task(this);
+            loop_->queueInLoop(task);
         }
     }
 }
 
-void TcpConnection::send(const std::string& message)
+void TcpConnection::sendInLoop(const std::string& message)
 {
     if(pChannel_->isWriting())
     {
@@ -82,10 +84,24 @@ void TcpConnection::send(const std::string& message)
                 pChannel_->enableWrite();
             }
             else
-                loop_->queueLoop(this, nullptr);
+            {
+                Task task(this);
+                loop_->queueInLoop(task);
+            }
 
         }
 
+    }
+}
+
+void TcpConnection::send(const std::string& message)
+{
+    if(loop_->isInLoopThread())
+        sendInLoop(message);
+    else
+    {
+        Task task(this, message, this);
+        loop_->runInLoop(task);
     }
 }
 
@@ -104,7 +120,13 @@ int TcpConnection::getSocket()
     return cfd_;
 }
 
-void TcpConnection::run(void* param)
+void TcpConnection::run0()
 {
     pUser_->OnWriteComplete(this);
 }
+
+void TcpConnection::run2(const std::string& message, void* param)
+{
+    sendInLoop(message);
+}
+

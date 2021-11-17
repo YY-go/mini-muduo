@@ -1,16 +1,24 @@
 #include "Thread.h"
+#include "CurrentThread.h"
 #include "IRun.h"
 #include <unistd.h>
 #include <sys/syscall.h>
+#include "TcpConnection.h"
+
+namespace CurrentThread
+{
+    __thread int t_cachedTid = 0;
+}
 
 void* globalRun(void* arg)
 {
-    ((Thread*) arg)->run();
+    ((Thread*)arg)->settid();
+    ((Thread*)arg)->task_.doTask();
     return 0;
 }
 
-Thread::Thread(IRun* run)
-    :run_(run)
+Thread::Thread(Task& task)
+    :task_(task)
 {
 
 }
@@ -21,14 +29,8 @@ void Thread::start()
     ::pthread_create(&t, nullptr, globalRun, this);
 }
 
-void Thread::run()
-{
-    settid();
-    run_->run(nullptr);
-}
-
 void Thread::settid()
 {
-    tid = static_cast<pid_t>(::syscall(SYS_gettid));
+    tid = CurrentThread::tid(); 
 }
 

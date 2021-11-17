@@ -4,10 +4,11 @@
 #include "IMuduoUser.h"
 #include "TcpServer.h"
 #include "IRun.h"
+#include "ThreadPool.h"
 class EventLoop;
 
 class EchoServer : public IMuduoUser
-                 , public IRun
+                 , public IRun2
 {
 public:
     EchoServer(EventLoop* loop);
@@ -16,12 +17,15 @@ public:
     virtual void OnMessage(TcpConnection* pCon, Buffer* pBuf);
     virtual void OnConnection(TcpConnection* pCon);
     virtual void OnWriteComplete(TcpConnection* pCon);
-    virtual void run(void* param);
+    virtual void run2(const std::string& str, void* tcp);
 private:
+    int fib(int n);
     EventLoop* loop_;
-    TcpServer Server_;
+    TcpServer server_;
+    ThreadPool threadPool_;
     int64_t timer_;
     int index_;
 };
 
 #endif
+

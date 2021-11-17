@@ -2,21 +2,22 @@
 #define THREADPOOL_H
 
 #include "IRun.h"
+#include "Task.h"
 #include "BlockingQueue.h"
 #include <vector>
 class Thread;
 
-class ThreadPool : public IRun
+class ThreadPool : public IRun0
 {
 public:
     ThreadPool();
     void start(int numThreads);
-    void addTask(IRun* pRun);
+    void addTask(Task& task);
 
-    virtual void run(void* param);
+    virtual void run0();
 private:
     void runInThead();
-    BlockingQueue<IRun*> tasks_;
+    BlockingQueue<Task> tasks_;
     std::vector<Thread*> threads_;
 };
 

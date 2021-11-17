@@ -2,19 +2,19 @@
 #define THREAD_H
 
 
+#include "Task.h"
 #include <pthread.h>
-class IRun;
 
 class Thread
 {
 public:
-    Thread(IRun* run);
+    Thread(Task& task);
     void start();
-    void run();
 private:
     void settid();
-    IRun* run_;
+    Task task_;
     pid_t tid;
+    friend void* globalRun(void* arg);
 };
 
 

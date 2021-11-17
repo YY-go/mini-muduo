@@ -6,10 +6,13 @@
 #include <sys/eventfd.h>
 #include <stdio.h>
 #include "TimerQueue.h"
+#include "CurrentThread.h"
 
 EventLoop::EventLoop() 
     : quit_(false)
+    , callingPendingFunctors_(false)
     , poller_(new Epoll())
+    , threadId_(CurrentThread::tid())
     , pTimerQueue_(new TimerQueue(this))
 {
     eventfd_ = createEventfd();
@@ -42,11 +45,23 @@ void EventLoop::update(Channel* pChannel)
     poller_->update(pChannel);
 }
 
-void EventLoop::queueLoop(IRun* pRun, void* param)
+void EventLoop::queueInLoop(Task& task)
 {
-    Runner r(pRun, param);
-    PendingFunctors_.push_back(r);
-    wakeup();
+    {
+        MutexLockGuard guard(mutex_);
+        pendingFunctors_.push_back(task);
+    }
+
+    if(!isInLoopThread() || callingPendingFunctors_)
+        wakeup();
+}
+
+void EventLoop::runInLoop(Task& task)
+{
+    if(isInLoopThread())
+        task.doTask();
+    else
+        queueInLoop(task);
 }
 
 void EventLoop::wakeup()
@@ -71,9 +86,14 @@ void EventLoop::handleWrite()
 
 void EventLoop::doPendingFunctors()
 {
-    std::vector<Runner> tempRuns;
-    tempRuns.swap(PendingFunctors_);
-    for(auto f : tempRuns) f.doRun();
+    std::vector<Task> tempRuns;
+    callingPendingFunctors_ = true;
+    {
+        MutexLockGuard guard(mutex_);
+        tempRuns.swap(pendingFunctors_);
+    }
+    for(auto f : tempRuns) f.doTask();
+    callingPendingFunctors_ = false;
 }
 
 int EventLoop::createEventfd()
@@ -83,23 +103,28 @@ int EventLoop::createEventfd()
     return n;
 }
 
-int64_t EventLoop::runAt(MyTimeStamp when, IRun* pRun)
+int64_t EventLoop::runAt(MyTimeStamp when, IRun0* pRun)
 {
     return pTimerQueue_->addTimer(pRun, when, 0.0);
 }
 
-int64_t EventLoop::runAfter(double delay, IRun* pRun)
+int64_t EventLoop::runAfter(double delay, IRun0* pRun)
 {
     return pTimerQueue_->addTimer(pRun, MyTimeStamp::nowAfter(delay), 0.0);
 }
 
-int64_t EventLoop::runEvery(double interval, IRun* pRun)
+int64_t EventLoop::runEvery(double interval, IRun0* pRun)
 {
     return pTimerQueue_->addTimer(pRun, MyTimeStamp::nowAfter(interval), interval);
 }
 
-void EventLoop::cancelTimer(int64_t timerfd)
+void EventLoop::cancelTimer(int64_t timerId)
 {
-    pTimerQueue_->cancelTimer(timerfd);
+    pTimerQueue_->cancelTimer(timerId);
+}
+
+bool EventLoop::isInLoopThread()
+{
+    return threadId_ == CurrentThread::tid();
 }
 
