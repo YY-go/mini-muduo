@@ -9,10 +9,12 @@
 #include <netinet/tcp.h>
 #include <netinet/in.h>
 #include <sys/epoll.h>
+#include "Channel.h"
+#include <vector>
 
 using namespace std;
 
-TcpServer::TcpServer()
+TcpServer::TcpServer() : epollfd_(-1), lfd_(-1)
 {
 
 }
@@ -22,100 +24,10 @@ TcpServer::~TcpServer()
 
 }
 
-void TcpServer::start()
-{
-
-    int lfd = init();
-    int efd = epoll_create1(EPOLL_CLOEXEC);
-    if(efd == -1)
-    {
-        perror("epoll_create1 error");
-        exit(1);
-    }
-
-    int ret;
-    struct epoll_event ev;
-    ev.data.fd = lfd;
-    ev.events = EPOLLIN;
-    ret = epoll_ctl(efd, EPOLL_CTL_ADD, lfd, &ev);
-
-    const int MAX_EVENTS = 1024;
-    struct epoll_event events[MAX_EVENTS];
-    while(1)
-    {
-        int fds = epoll_wait(efd, events, MAX_EVENTS, -1);
-        if(fds == -1)
-        {
-            perror("epoll_wait error");
-            exit(1);
-        }
-
-        struct sockaddr_in clet_addr;
-        bzero(&clet_addr, sizeof clet_addr);
-        socklen_t clet_addr_len = sizeof clet_addr;
-
-        for(int i = 0; i < fds; ++i)
-        {
-            if(events[i].data.fd == lfd)
-            {
-                int cfd = accept4(lfd, (struct sockaddr*) &clet_addr, &clet_addr_len, SOCK_CLOEXEC | SOCK_NONBLOCK);
-                if(cfd == -1)
-                {
-                    perror("accept error");
-                    exit(1);
-                }
-
-                ev.data.fd = cfd;
-                ev.events = EPOLLIN;
-                ret = epoll_ctl(efd, EPOLL_CTL_ADD, cfd, &ev);
-                if(ret == -1)
-                {
-                    perror("epoll_ctl error");
-                    exit(1);
-                }
-
-                cout << "new connection, socket: " << cfd << endl;
-            }
-            else
-            {
-                if(events[i].events & EPOLLIN)
-                {
-                    char buf[1024];
-                    ret = read(events[i].data.fd, buf, 1024);
-                    if(ret < 0)
-                    {
-                        perror("read error");
-                        cout << "connection close, socket: " << events[i].data.fd << endl;
-                        exit(1);
-                    }
-                    else if(ret == 0)
-                    {
-                        close(events[i].data.fd);
-                        cout << "connection close, socket: " << events[i].data.fd << endl;
-                    }
-                    else
-                    {
-                        ret = write(events[i].data.fd, buf, ret);
-                        if(ret < 0)
-                        {
-                            perror("write error");
-                            exit(1);
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
 int TcpServer::init()
 {
     int lfd = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK | SOCK_CLOEXEC, IPPROTO_TCP);
-    if(lfd == -1)
-    {
-        perror("socket error");
-        exit(1);
-    }
+    if(lfd == -1)   perror("socket error");
 
     struct sockaddr_in serv_addr;
     bzero(&serv_addr, sizeof(serv_addr));
@@ -130,19 +42,88 @@ int TcpServer::init()
 
     int ret;
     ret = bind(lfd, (struct sockaddr*) &serv_addr, sizeof serv_addr);
-    if(ret == -1)
-    {
-        perror("bind error");
-        exit(1);
-    }
+    if(ret == -1)   perror("bind error");
 
     ret = listen(lfd, 1024);
-    if(ret == -1)
-    {
-        perror("listen error");
-        exit(1);
-    }
+    if(ret == -1)   perror("listen error");
 
     return lfd;
 }
 
+void TcpServer::OnIn(int sockfd)
+{
+    
+    if(sockfd == lfd_)
+    {
+        struct sockaddr_in clet_addr;
+        bzero(&clet_addr, sizeof clet_addr);
+        socklen_t clet_addr_len = sizeof clet_addr;
+
+        int cfd = accept4(lfd_, (struct sockaddr*) &clet_addr, &clet_addr_len, SOCK_CLOEXEC | SOCK_NONBLOCK);
+        if(cfd == -1)   perror("accept error");
+
+        Channel* pChannel = new Channel(epollfd_, cfd);
+        pChannel->setCallBack(this);
+        pChannel->enableRead();
+
+        cout << "new connection, socket: " << cfd << endl;
+    }
+    else
+    {
+        char buf[1024];
+        bzero(buf, sizeof buf);
+
+        int ret = read(sockfd, buf, 1024);
+        if(ret < 0)
+        {
+            perror("read error");
+            if(errno == ECONNRESET) close(sockfd);
+            cout << "connection close, socket: " << sockfd << endl;
+        }
+        else if(ret == 0)
+        {
+            close(sockfd);
+            cout << "connection close, socket: " << sockfd << endl;
+        }
+        else
+        {
+            int writelen = write(sockfd, buf, ret);
+            if(writelen != ret)    perror("write error");
+        }
+    }
+}
+
+void TcpServer::start()
+{
+
+    epollfd_ = epoll_create1(EPOLL_CLOEXEC);
+    if(epollfd_ == -1)   perror("epoll_create1 error");
+
+    lfd_ = init();
+    Channel* pChannel = new Channel(epollfd_, lfd_);
+    pChannel->setCallBack(this);
+    pChannel->enableRead();
+    
+    while(1)
+    {
+        std::vector<Channel*> channels;
+        int fds = epoll_wait(epollfd_, events_, max_events, -1);
+        if(fds == -1)
+        {
+            perror("epoll_wait error");
+            break;
+        }
+
+        for(int i = 0; i < fds; ++i)
+        {
+            Channel* pChannel =  static_cast<Channel*>(events_[i].data.ptr);
+            pChannel->setRevent(events_[i].events);
+            channels.push_back(pChannel);
+        }
+
+        for(auto ch : channels)
+        {
+            ch->handleEvent();
+        }
+    }
+}
