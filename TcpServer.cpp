@@ -16,7 +16,10 @@
 
 using namespace std;
 
-TcpServer::TcpServer(EventLoop* loop) : loop_(loop), pAcceptor_(nullptr), pUser_(nullptr)
+TcpServer::TcpServer(EventLoop* loop)
+    : loop_(loop)
+    , pAcceptor_(nullptr)
+    , pUser_(nullptr)
 {
 
 }
@@ -31,11 +34,15 @@ void TcpServer::start()
     pAcceptor_ = new Acceptor(loop_);
     pAcceptor_->setCallBack(this);
     pAcceptor_->start();
+    eventLoopThreadPool_.start(2);
 }
 
 void TcpServer::newConnection(int sockfd)
 {
-    TcpConnection* pTcpConnecton = new TcpConnection(loop_, sockfd);
+
+    EventLoop* loop = eventLoopThreadPool_.getLoop();
+    if(loop == nullptr) loop = loop_;
+    TcpConnection* pTcpConnecton = new TcpConnection(loop, sockfd);
     connectons_[sockfd] = pTcpConnecton;
     pTcpConnecton->setUser(pUser_);
     pTcpConnecton->connectEstablished();

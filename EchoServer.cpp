@@ -47,7 +47,7 @@ void EchoServer::OnWriteComplete(TcpConnection* pCon)
 {
     struct timeval tv;
     gettimeofday(&tv, nullptr);
-    std::cout << tv.tv_sec << "." << tv.tv_usec  << " OnWriteComplete" << std::endl;
+    std::cout << pCon->getEventLoopTid() << " "<< tv.tv_sec << "." << tv.tv_usec  << " OnWriteComplete" << std::endl;
 }
 
 void EchoServer::run2(const std::string& str, void* param)

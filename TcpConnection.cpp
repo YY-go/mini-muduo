@@ -120,6 +120,11 @@ int TcpConnection::getSocket()
     return cfd_;
 }
 
+int TcpConnection::getEventLoopTid()
+{
+    return loop_->getTid();
+}
+
 void TcpConnection::run0()
 {
     pUser_->OnWriteComplete(this);

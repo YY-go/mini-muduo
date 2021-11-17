@@ -25,6 +25,7 @@ public:
     int64_t runEvery(double interval, IRun0* pRun);
     void cancelTimer(int64_t timerId);
     bool isInLoopThread();
+    pid_t getTid();
 
     virtual void handleRead();
     virtual void handleWrite();

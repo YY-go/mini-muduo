@@ -21,6 +21,7 @@ public:
     void connectEstablished();
     void setUser(IMuduoUser* pUser);
     int getSocket();
+    int getEventLoopTid();
     virtual void handleRead();
     virtual void handleWrite();
     virtual void run0();

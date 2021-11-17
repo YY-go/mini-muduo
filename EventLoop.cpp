@@ -128,3 +128,8 @@ bool EventLoop::isInLoopThread()
     return threadId_ == CurrentThread::tid();
 }
 
+pid_t EventLoop::getTid()
+{
+    return threadId_;
+}
+
