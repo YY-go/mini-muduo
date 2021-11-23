@@ -2,7 +2,7 @@
 #define TCPSERVER_H
 
 #include <sys/epoll.h>
-#include "IAcceptorCallBack.h"
+#include "IServerCallBack.h"
 #include <map>
 #include "EventLoopThreadPool.h"
 class Acceptor;
@@ -12,7 +12,7 @@ class IMuduoUser;
 class Channel;
 const int max_events = 1024;
 
-class TcpServer : public IAcceptorCallBack
+class TcpServer : public IServerCallBack
 {
 public:
     TcpServer(EventLoop* loop);
@@ -20,12 +20,13 @@ public:
     void setCallBack(IMuduoUser* pUser);
     void start();
     virtual void newConnection(int sockfd);
+    virtual void closeConnection(const std::shared_ptr<TcpConnection>& pCon);
 private:
     EventLoop* loop_;
     struct epoll_event events_[max_events];
-    std::map<int, TcpConnection*> connectons_;
+    std::map<int, std::shared_ptr<TcpConnection>> connectons_;
     EventLoopThreadPool eventLoopThreadPool_;
-    Acceptor* pAcceptor_;
+    std::unique_ptr<Acceptor> pAcceptor_;
     IMuduoUser* pUser_;
 };
 

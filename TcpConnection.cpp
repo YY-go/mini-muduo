@@ -8,20 +8,24 @@
 #include "IMuduoUser.h"
 #include "EventLoop.h"
 #include "Task.h"
+#include "Socket.h"
+#include "IServerCallBack.h"
 
 TcpConnection::TcpConnection(EventLoop* loop, int sockfd)
     : loop_(loop)
-    , cfd_(sockfd)
+    , cfd_(new Socket(sockfd))
+    , pChannel_(new Channel(loop_, cfd_->fd()))
     , pUser_(nullptr)
+    , pServerCallBack_(nullptr)
+    , highWaterMark_(64*1024*1024)
+    , status_(kConnecting)
 {
-    pChannel_ = new Channel(loop_, cfd_);
     pChannel_->setCallBack(this);
     pChannel_->enableRead();
 }
 
 TcpConnection::~TcpConnection()
 {
-
 }
 
 void TcpConnection::handleRead()
@@ -29,30 +33,28 @@ void TcpConnection::handleRead()
     char buf[1024];
     bzero(buf, sizeof buf);
 
-    int readBytes = read(cfd_, buf, 1024);
+    int readBytes = read(cfd_->fd(), buf, 1024);
     if(readBytes < 0)
     {
         perror("read error");
-        if(errno == ECONNRESET) close(cfd_);
-        std::cout << "connection close, socket: " << cfd_ << std::endl;
+        if(errno == ECONNRESET) handleClose();
     }
     else if(readBytes == 0)
     {
-        close(cfd_);
-        std::cout << "connection close, socket: " << cfd_ << std::endl;
+        handleClose();
     }
     else
     {
         std::string line(buf, readBytes);
         inBuf_.append(line);
-        pUser_->OnMessage(this, &inBuf_);
+        pUser_->OnMessage(shared_from_this(), &inBuf_);
     }
 
 }
 
 void TcpConnection::handleWrite()
 {
-    int writeBytes = ::write(cfd_, outBuf_.peek(), outBuf_.readableBytes());
+    int writeBytes = ::write(cfd_->fd(), outBuf_.peek(), outBuf_.readableBytes());
     if(writeBytes == -1) perror("write error");
     else
     {
@@ -60,10 +62,16 @@ void TcpConnection::handleWrite()
         if(outBuf_.readableBytes() == 0)
         {
             pChannel_->disableWrite();
-            Task task(this);
+            Task task(this, shared_from_this());
             loop_->queueInLoop(task);
         }
     }
+}
+
+void TcpConnection::handleClose() 
+{
+    pChannel_->disableRead();
+    pServerCallBack_->closeConnection(shared_from_this());
 }
 
 void TcpConnection::sendInLoop(const std::string& message)
@@ -74,7 +82,7 @@ void TcpConnection::sendInLoop(const std::string& message)
     }
     else
     {
-        int writeBytes = ::write(cfd_, message.c_str(), message.size());
+        int writeBytes = ::write(cfd_->fd(), message.c_str(), message.size());
         if(writeBytes == -1) perror("wirte error");
         else
         {
@@ -85,7 +93,7 @@ void TcpConnection::sendInLoop(const std::string& message)
             }
             else
             {
-                Task task(this);
+                Task task(this, shared_from_this());
                 loop_->queueInLoop(task);
             }
 
@@ -100,7 +108,7 @@ void TcpConnection::send(const std::string& message)
         sendInLoop(message);
     else
     {
-        Task task(this, message, this);
+        Task task(this, message, shared_from_this());
         loop_->runInLoop(task);
     }
 }
@@ -110,14 +118,43 @@ void TcpConnection::setUser(IMuduoUser* pUser)
     pUser_ = pUser;
 }
 
+void TcpConnection::setServerCallBack(IServerCallBack* pServerCallBack)
+{
+    pServerCallBack_ = pServerCallBack;
+}
+
+bool TcpConnection::isConnected() const
+{
+    return status_ == kConnected;
+}
+
+bool TcpConnection::isDisconnected() const
+{
+    return status_ == kDisconnected;
+}
+
+void TcpConnection::setStatus(Status status)
+{
+    status_ = status;
+}
+
 void TcpConnection::connectEstablished()
 {
-    if(pUser_) pUser_->OnConnection(this);
+    setStatus(kConnected);
+    pChannel_->tie(weak_from_this());
+    if(pUser_) pUser_->OnConnection(shared_from_this());
+}
+
+void TcpConnection::connectDestoryed()
+{
+    pChannel_->remove();
+    setStatus(kDisconnected);
+    if(pUser_) pUser_->OnConnection(shared_from_this());
 }
 
 int TcpConnection::getSocket()
 {
-    return cfd_;
+    return cfd_->fd();
 }
 
 int TcpConnection::getEventLoopTid()
@@ -125,12 +162,12 @@ int TcpConnection::getEventLoopTid()
     return loop_->getTid();
 }
 
-void TcpConnection::run0()
+void TcpConnection::run0(const std::shared_ptr<void>& param)
 {
-    pUser_->OnWriteComplete(this);
+    pUser_->OnWriteComplete(shared_from_this());
 }
 
-void TcpConnection::run2(const std::string& message, void* param)
+void TcpConnection::run2(const std::string& message, const std::shared_ptr<void>& param)
 {
     sendInLoop(message);
 }

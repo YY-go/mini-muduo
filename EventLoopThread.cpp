@@ -37,7 +37,6 @@ EventLoop* EventLoopThread::start()
         loop = loop_;
     }
 
-    std::cout << "looptid: " << tid_ << std::endl;
     return loop;
 }
 

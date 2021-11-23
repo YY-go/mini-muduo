@@ -7,6 +7,8 @@
 #include "TimeStamp.h"
 #include "Mutex.h"
 #include "Task.h"
+#include <memory>
+class Socket;
 class Channel;
 class Epoll;
 class TimerQueue;
@@ -18,6 +20,7 @@ public:
     ~EventLoop();
     void loop();
     void update(Channel* pChannel);
+    void removeChannel(Channel* pChannel);
     void queueInLoop(Task& task);
     void runInLoop(Task& task);
     int64_t runAt(MyTimeStamp when, IRun0* pRun);
@@ -29,6 +32,7 @@ public:
 
     virtual void handleRead();
     virtual void handleWrite();
+    virtual void handleClose();
 private:
     void wakeup();
     int createEventfd();
@@ -36,13 +40,13 @@ private:
 
     bool quit_;
     bool callingPendingFunctors_;
-    Epoll* poller_;
-    int eventfd_;
+    std::unique_ptr<Epoll> poller_;
+    std::unique_ptr<Socket> eventfd_;
     const pid_t threadId_;
-    Channel* pWakeupChannel_;
+    std::unique_ptr<Channel> pWakeupChannel_;
     MutexLock mutex_;
     std::vector<Task> pendingFunctors_;
-    TimerQueue* pTimerQueue_;
+    std::unique_ptr<TimerQueue> pTimerQueue_;
 };
 
 #endif

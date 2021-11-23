@@ -25,10 +25,10 @@ EchoServer::~EchoServer()
 void EchoServer::start()
 {
     server_.start();
-    threadPool_.start(3);
+    threadPool_.start(4);
 }
 
-void EchoServer::OnMessage(TcpConnection* pCon, Buffer* pBuf)
+void EchoServer::OnMessage(const std::shared_ptr<TcpConnection> &pCon, Buffer* pBuf)
 {
     while(pBuf->readableBytes() >= message_length)
     {
@@ -38,22 +38,26 @@ void EchoServer::OnMessage(TcpConnection* pCon, Buffer* pBuf)
     }
 }
 
-void EchoServer::OnConnection(TcpConnection* pCon)
+void EchoServer::OnConnection(const std::shared_ptr<TcpConnection> &pCon)
 {
-    std::cout << "new connection, socket: " << pCon->getSocket() << std::endl;
+    if(pCon->isConnected()) std::cout << "new connection, socket: " << pCon->getSocket() << ", " << "add to loop thread: " << pCon->getEventLoopTid() << std::endl;
+    if(pCon->isDisconnected()) std::cout << "connection close, socket: " << pCon->getSocket() << std::endl;
 }
 
-void EchoServer::OnWriteComplete(TcpConnection* pCon)
+void EchoServer::OnWriteComplete(const std::shared_ptr<TcpConnection> &pCon)
 {
-    struct timeval tv;
-    gettimeofday(&tv, nullptr);
-    std::cout << pCon->getEventLoopTid() << " "<< tv.tv_sec << "." << tv.tv_usec  << " OnWriteComplete" << std::endl;
+    std::cout << "loop thread " << CurrentThread::tid() << " OnWriteComplete" << std::endl;
 }
 
-void EchoServer::run2(const std::string& str, void* param)
+void EchoServer::OnHighWaterMark(const std::shared_ptr<TcpConnection> &pCon) 
 {
-    printf("fib(45) = %d, tid = %d\n", fib(45), CurrentThread::tid());
-    ((TcpConnection*)param)->send(str + "\n");
+
+}
+
+void EchoServer::run2(const std::string& str, const std::shared_ptr<void>& param)
+{
+    printf("worker thread %d, fib(45) = %d\n", CurrentThread::tid(), fib(45));
+    ((TcpConnection*)param.get())->send(str + "\n");
 }
 
 int EchoServer::fib(int n)

@@ -5,21 +5,18 @@
 #include <netinet/in.h>
 #include <strings.h>
 #include "Channel.h"
-#include "IAcceptorCallBack.h"
+#include "IServerCallBack.h"
+#include "Socket.h"
 
 
 Acceptor::Acceptor(EventLoop* loop)
     : loop_(loop)
-    , lfd_(-1)
-    , pAcceptorChannel(nullptr)
     , pCallBack_(nullptr)
 {
-
 }
 
 Acceptor::~Acceptor()
 {
-
 }
 
 int Acceptor::init()
@@ -50,13 +47,13 @@ int Acceptor::init()
 
 void Acceptor::start()
 {
-    lfd_ = init();
-    pAcceptorChannel = new Channel(loop_, lfd_);
+    lfd_.reset(new Socket(init()));
+    pAcceptorChannel.reset(new Channel(loop_, lfd_->fd()));
     pAcceptorChannel->setCallBack(this);
     pAcceptorChannel->enableRead();
 }
 
-void Acceptor::setCallBack(IAcceptorCallBack* pCallBack)
+void Acceptor::setCallBack(IServerCallBack* pCallBack)
 {
     pCallBack_ = pCallBack;
 }
@@ -67,12 +64,17 @@ void Acceptor::handleRead()
     bzero(&clet_addr, sizeof clet_addr);
     socklen_t clet_addr_len = sizeof clet_addr;
 
-    int cfd = accept4(lfd_, (struct sockaddr*) &clet_addr, &clet_addr_len, SOCK_CLOEXEC | SOCK_NONBLOCK);
+    int cfd = accept4(lfd_->fd(), (struct sockaddr*) &clet_addr, &clet_addr_len, SOCK_CLOEXEC | SOCK_NONBLOCK);
     if(cfd == -1)   perror("accept error");
     pCallBack_->newConnection(cfd);
 }
 
 void Acceptor::handleWrite()
+{
+
+}
+
+void Acceptor::handleClose()
 {
 
 }

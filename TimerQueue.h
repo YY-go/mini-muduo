@@ -6,6 +6,8 @@
 #include "IRun.h"
 #include <vector>
 #include <set>
+#include <memory>
+class Socket;
 class EventLoop;
 class Channel;
 class Timer;
@@ -22,9 +24,11 @@ public:
     int64_t addTimer(IRun0* pRun, MyTimeStamp when, double interval);
     void cancelTimer(int64_t timerId);
 
-    virtual void handleRead();
-    virtual void handleWrite();
-    virtual void run2(const std::string& str, void* timer);
+    virtual void handleRead() override;
+    virtual void handleWrite() override;
+    virtual void handleClose() override;
+    virtual void run2(const std::string& str, const std::shared_ptr<void>& param) override{};
+    virtual void run2(const std::string &str, void *param) override;
 
     private:
     typedef std::pair<MyTimeStamp, Timer*> Entry;
@@ -38,10 +42,10 @@ public:
     bool insert(Timer* pItem);
     struct timespec howMuchTimeFromNow(MyTimeStamp when);
 
-    int timerfd_;
+    std::unique_ptr<Socket> timerfd_;
     TimerList timers_;
     EventLoop* loop_;
-    Channel* timerfdChannel_;
+    std::unique_ptr<Channel> timerfdChannel_;
 };
 
 #endif

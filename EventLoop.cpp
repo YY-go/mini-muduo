@@ -7,6 +7,8 @@
 #include <stdio.h>
 #include "TimerQueue.h"
 #include "CurrentThread.h"
+#include "Socket.h"
+#include <iostream>
 
 EventLoop::EventLoop() 
     : quit_(false)
@@ -15,8 +17,8 @@ EventLoop::EventLoop()
     , threadId_(CurrentThread::tid())
     , pTimerQueue_(new TimerQueue(this))
 {
-    eventfd_ = createEventfd();
-    pWakeupChannel_ = new Channel(this, eventfd_);
+    eventfd_.reset(new Socket(createEventfd()));
+    pWakeupChannel_.reset(new Channel(this, eventfd_->fd()));
     pWakeupChannel_->setCallBack(this);
     pWakeupChannel_->enableRead();
 }
@@ -28,6 +30,7 @@ EventLoop::~EventLoop()
 
 void EventLoop::loop()
 {
+    std::cout << "loop threadId: " << threadId_ << std::endl;
     while(!quit_)
     {
         std::vector<Channel*> channels;
@@ -43,6 +46,11 @@ void EventLoop::loop()
 void EventLoop::update(Channel* pChannel)
 {
     poller_->update(pChannel);
+}
+
+void EventLoop::removeChannel(Channel* pChannel)
+{
+    poller_->removeChannel(pChannel);
 }
 
 void EventLoop::queueInLoop(Task& task)
@@ -67,19 +75,24 @@ void EventLoop::runInLoop(Task& task)
 void EventLoop::wakeup()
 {
     uint64_t one = 1;
-    ssize_t n = ::write(eventfd_, &one, sizeof one);
+    ssize_t n = ::write(eventfd_->fd(), &one, sizeof one);
     if(n != sizeof one) perror("wakeup error");
 }
 
 void EventLoop::handleRead()
 {
     uint64_t one;
-    ssize_t n = ::read(eventfd_, &one, sizeof one);
+    ssize_t n = ::read(eventfd_->fd(), &one, sizeof one);
     if(n != sizeof one) perror("read error");
 }
 
 
 void EventLoop::handleWrite()
+{
+
+}
+
+void EventLoop::handleClose()
 {
 
 }

@@ -1,5 +1,7 @@
 #include "ThreadPool.h"
 #include "Thread.h"
+#include <iostream>
+#include "CurrentThread.h"
 
 
 ThreadPool::ThreadPool()
@@ -31,6 +33,7 @@ void ThreadPool::run0()
 
 void ThreadPool::runInThead()
 {
+    std::cout << "worker threadId: " << CurrentThread::tid() << std::endl;
     while(true)
     {
         tasks_.take().doTask();

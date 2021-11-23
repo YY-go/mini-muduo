@@ -14,10 +14,12 @@ public:
     EchoServer(EventLoop* loop);
     ~EchoServer();
     void start();
-    virtual void OnMessage(TcpConnection* pCon, Buffer* pBuf);
-    virtual void OnConnection(TcpConnection* pCon);
-    virtual void OnWriteComplete(TcpConnection* pCon);
-    virtual void run2(const std::string& str, void* tcp);
+    virtual void OnMessage(const std::shared_ptr<TcpConnection> &pCon, Buffer* pBuf) override;
+    virtual void OnConnection(const std::shared_ptr<TcpConnection> &pCon) override;
+    virtual void OnWriteComplete(const std::shared_ptr<TcpConnection> &pCon) override;
+    virtual void OnHighWaterMark(const std::shared_ptr<TcpConnection> &pCon) override;
+    virtual void run2(const std::string &str, const std::shared_ptr<void>& param) override;
+    virtual void run2(const std::string &str, void *param) override {};
 private:
     int fib(int n);
     EventLoop* loop_;

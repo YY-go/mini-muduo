@@ -13,15 +13,16 @@
 #include <vector>
 #include "Acceptor.h"
 #include "TcpConnection.h"
+#include <signal.h>
 
 using namespace std;
 
 TcpServer::TcpServer(EventLoop* loop)
     : loop_(loop)
-    , pAcceptor_(nullptr)
+    , pAcceptor_(new Acceptor(loop_))
     , pUser_(nullptr)
 {
-
+    ::signal(SIGPIPE, SIG_IGN);
 }
 
 TcpServer::~TcpServer()
@@ -31,7 +32,6 @@ TcpServer::~TcpServer()
 
 void TcpServer::start()
 {
-    pAcceptor_ = new Acceptor(loop_);
     pAcceptor_->setCallBack(this);
     pAcceptor_->start();
     eventLoopThreadPool_.start(2);
@@ -42,10 +42,17 @@ void TcpServer::newConnection(int sockfd)
 
     EventLoop* loop = eventLoopThreadPool_.getLoop();
     if(loop == nullptr) loop = loop_;
-    TcpConnection* pTcpConnecton = new TcpConnection(loop, sockfd);
+    std::shared_ptr<TcpConnection> pTcpConnecton(new TcpConnection(loop, sockfd));
     connectons_[sockfd] = pTcpConnecton;
     pTcpConnecton->setUser(pUser_);
+    pTcpConnecton->setServerCallBack(this);
     pTcpConnecton->connectEstablished();
+}
+
+void TcpServer::closeConnection(const std::shared_ptr<TcpConnection>& pCon)
+{
+    connectons_.erase(pCon->getSocket());
+    pCon->connectDestoryed();
 }
 
 void TcpServer::setCallBack(IMuduoUser* pUser)

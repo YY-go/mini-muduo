@@ -5,11 +5,13 @@
 #include <string.h>
 #include "EventLoop.h"
 #include "Timer.h"
+#include "Socket.h"
+#include <memory>
 
 TimerQueue::TimerQueue(EventLoop* loop)
-    : timerfd_(createTimerfd())
+    : timerfd_(new Socket(createTimerfd()))
     , loop_(loop)
-    , timerfdChannel_(new Channel(loop_, timerfd_))
+    , timerfdChannel_(new Channel(loop_, timerfd_->fd()))
 {
     timerfdChannel_->setCallBack(this);
     timerfdChannel_->enableRead();
@@ -17,7 +19,6 @@ TimerQueue::TimerQueue(EventLoop* loop)
 
 TimerQueue::~TimerQueue()
 {
-    ::close(timerfd_);
 }
 
 void TimerQueue::run2(const std::string& str, void* timer)
@@ -32,7 +33,7 @@ void TimerQueue::doAddTimer(Timer* timer)
 {
     bool earliestChanged = insert(timer);
     if(earliestChanged)
-        resetTimerfd(timerfd_, timer->getStamp());
+        resetTimerfd(timerfd_->fd(), timer->getStamp());
 }
 
 void TimerQueue::doCancelTimer(Timer* timer)
@@ -64,7 +65,7 @@ void TimerQueue::cancelTimer(int64_t timerId)
 void TimerQueue::handleRead()
 {
     MyTimeStamp now(MyTimeStamp::now());
-    readTimerfd(timerfd_, now);
+    readTimerfd(timerfd_->fd(), now);
 
     std::vector<Entry> expired = getExpired(now);
     for(auto entry : expired)
@@ -73,6 +74,11 @@ void TimerQueue::handleRead()
 }
 
 void TimerQueue::handleWrite()
+{
+
+}
+
+void TimerQueue::handleClose()
 {
 
 }
@@ -120,7 +126,7 @@ void TimerQueue::reset(const std::vector<Entry>& expired, MyTimeStamp now)
     }
     if(nextExpire.valid())
     {
-        resetTimerfd(timerfd_, nextExpire);
+        resetTimerfd(timerfd_->fd(), nextExpire);
     }
 }
 

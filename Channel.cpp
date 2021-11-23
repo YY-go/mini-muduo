@@ -10,6 +10,7 @@ Channel::Channel(EventLoop* loop, int sockfd)
     , event_(0)
     , revent_(0)
     , index_(-1)
+    , tied_(false)
     , loop_(loop)
     , callBack_(nullptr)
 {
@@ -26,13 +27,33 @@ void Channel::setCallBack(IChannelCallBack* callBack)
     callBack_ = callBack;
 }
 
+void Channel::tie(const std::weak_ptr<void>& obj)
+{
+    tie_ = obj;
+    tied_ = true;
+}
+
 void Channel::handleEvent()
+{
+    std::shared_ptr<void> guard;
+    if(tied_)
+    {
+         guard = tie_.lock();
+         if(guard)
+             handleEventWithGuard();
+    }
+    else
+        handleEventWithGuard();
+}
+
+void Channel::handleEventWithGuard()
 {
     if(callBack_)
     {
         if(revent_ & EPOLLIN) callBack_->handleRead();
         if(revent_ & EPOLLOUT) callBack_->handleWrite();
     }
+
 }
 
 void Channel::setRevent(int revent)
@@ -51,6 +72,12 @@ void Channel::enableRead()
     update();
 }
 
+void Channel::disableRead()
+{
+    event_ &= ~EPOLLIN;
+    update();
+}
+
 void Channel::enableWrite()
 {
     event_ |= EPOLLOUT;
@@ -61,6 +88,11 @@ void Channel::disableWrite()
 {
     event_ &= ~EPOLLOUT;
     update();
+}
+
+void Channel::remove()
+{
+    loop_->removeChannel(this);
 }
 
 bool Channel::isWriting()

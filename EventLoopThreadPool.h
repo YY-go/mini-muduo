@@ -14,7 +14,8 @@ public:
     void start(int numThreads);
     EventLoop* getLoop();
 
-    virtual void run0();
+    virtual void run0() override;
+    virtual void run0(const std::shared_ptr<void> &param) override {};
 private:
     void runInThead();
     int whichLoop_;
